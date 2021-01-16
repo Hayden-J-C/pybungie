@@ -1,5 +1,5 @@
-import destiny_components
-import destiny_definitions
-import destiny_enums
-import destiny_vendor_hashes
-from api import BungieAPI
+from .destiny_components import *
+from .destiny_definitions import *
+from .destiny_enums import *
+from .destiny_vendor_hashes import *
+from .api import BungieAPI

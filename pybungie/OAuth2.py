@@ -17,7 +17,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 load_dotenv()
 
-config_file_path = os.path.join(os.path.dirname(__file__), "config", "api.ini")
+config_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config", "api.ini")
 config = configparser.ConfigParser()
 config.read_file(open(config_file_path))
 SERVER_CERTIFICATE = config['SERVER_CERTIFICATE']
@@ -39,6 +39,7 @@ class OAuth2:
             "Authorization": "Basic " + ENCODED_DATA,
             "Content-Type": "application/x-www-form-urlencoded"
         }
+        self.__data = None
         self.__httpd = HTTPServer(('127.0.0.1', 5000), SimpleHTTPRequestHandler)
         os.environ["CLIENT_ID"] = client_id
         os.environ["CLIENT_SECRET"] = client_secret
@@ -46,13 +47,14 @@ class OAuth2:
         self.__start_server()
         self.__get_authorization_code()
         self.__get_tokens()
+        self._enabled = True
         self.__renewal_thread = threading.Thread(target=self.__renew_tokens)
         self.__renewal_thread.start()
 
     @staticmethod
     def __cert_gen():
-        serialNumber = 0
-        validityEndInSeconds = 10 * 365 * 24 * 60 * 60
+        serial_number = 0
+        validity_end_in_seconds = 10 * 365 * 24 * 60 * 60
         k = crypto.PKey()
         k.generate_key(crypto.TYPE_RSA, 4096)
         cert = crypto.X509()
@@ -63,9 +65,9 @@ class OAuth2:
         cert.get_subject().OU = SERVER_CERTIFICATE["ORGANIZATION_UNIT_NAME"]
         cert.get_subject().CN = SERVER_CERTIFICATE["COMMON_NAME"]
         cert.get_subject().emailAddress = SERVER_CERTIFICATE["EMAIL_ADDRESS"]
-        cert.set_serial_number(serialNumber)
+        cert.set_serial_number(serial_number)
         cert.gmtime_adj_notBefore(0)
-        cert.gmtime_adj_notAfter(validityEndInSeconds)
+        cert.gmtime_adj_notAfter(validity_end_in_seconds)
         cert.set_issuer(cert.get_subject())
         cert.set_pubkey(k)
         cert.sign(k, 'sha512')
@@ -73,6 +75,12 @@ class OAuth2:
             f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode("utf-8"))
         with open("server.pem", "a") as f:
             f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, k).decode("utf-8"))
+
+    def __update_post_data(self):
+        self.__data = {
+            'grant_type': "authorization_code",
+            'code': os.getenv("AUTH_CODE"),
+        }
 
     def __start_server(self):
         try:
@@ -115,12 +123,9 @@ class OAuth2:
                 self.__get_authorization_code()
 
     def __get_tokens(self):
-        data = {
-            'grant_type': "authorization_code",
-            'code': os.getenv("AUTH_CODE"),
-        }
         try:
-            response = requests.post(url=TOKEN_URL, headers=self.__headers, data=data)
+            self.__update_post_data()
+            response = requests.post(url=TOKEN_URL, headers=self.__headers, data=self.__data)
             response = response.json()
             os.environ["ACCESS_TOKEN"] = response['access_token']
             os.environ["REFRESH_TOKEN"] = response['refresh_token']
@@ -134,16 +139,13 @@ class OAuth2:
                 self.__get_tokens()
 
     def __renew_tokens(self):
-        while True:
+        while self._enabled:
             token_expiration = datetime.now() + timedelta(minutes=59)
-            while datetime.now() < token_expiration:
+            while datetime.now() < token_expiration and self._enabled:
                 time.sleep(5)
-            data = {
-                'grant_type': "refresh_token",
-                'refresh_token': os.environ["REFRESH_TOKEN"],
-            }
             try:
-                response = requests.post(url=TOKEN_URL, headers=self.__headers, data=data)
+                self.__update_post_data()
+                response = requests.post(url=TOKEN_URL, headers=self.__headers, data=self.__data)
                 response = response.json()
                 os.environ["ACCESS_TOKEN"] = response['access_token']
                 os.environ["REFRESH_TOKEN"] = response['refresh_token']
