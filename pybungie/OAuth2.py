@@ -13,15 +13,15 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 import ssl
 from dotenv import load_dotenv
 
+
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 load_dotenv()
 
-config_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config", "api.ini")
+config_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config", "pybungie.ini")
 config = configparser.ConfigParser()
 config.read_file(open(config_file_path))
 SERVER_CERTIFICATE = config['SERVER_CERTIFICATE']
-XBOX_SIGN_IN = config['XBOX_SIGN_IN']
 
 exp_urlpost = r'urlPost:\'(https://.*?)\''
 exp_ppft = r'<input type="hidden" name="PPFT" id=".*" value="(.*?)"/>'
@@ -33,16 +33,16 @@ RETRIED_AUTH = RETRIED_TOKEN = RETRIED_RENEWAL = RETRIED_SERVER = False
 
 class OAuth2:
 
-    def __init__(self, client_id: str, client_secret: str):
+    def __init__(self, api, client_id: str, client_secret: str):
         ENCODED_DATA = base64.b64encode(bytes(f"{client_id}:{client_secret}", "ISO-8859-1")).decode("ascii")
         self.__headers = {
             "Authorization": "Basic " + ENCODED_DATA,
             "Content-Type": "application/x-www-form-urlencoded"
         }
-        self.__data = None
+        self.__api = api
         self.__httpd = HTTPServer(('127.0.0.1', 5000), SimpleHTTPRequestHandler)
-        os.environ["CLIENT_ID"] = client_id
-        os.environ["CLIENT_SECRET"] = client_secret
+        os.environ["CLIENT-ID"] = client_id
+        os.environ["CLIENT-SECRET"] = client_secret
         self.__cert_gen()
         self.__start_server()
         self.__get_authorization_code()
@@ -76,12 +76,6 @@ class OAuth2:
         with open("server.pem", "a") as f:
             f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, k).decode("utf-8"))
 
-    def __update_post_data(self):
-        self.__data = {
-            'grant_type': "authorization_code",
-            'code': os.getenv("AUTH_CODE"),
-        }
-
     def __start_server(self):
         try:
             self.__httpd.socket = ssl.wrap_socket(self.__httpd.socket, certfile='server.pem', server_side=True)
@@ -104,14 +98,14 @@ class OAuth2:
             r = s.get(BUNGIE_SIGN_IN_URI)
             url_post = re.findall(exp_urlpost, r.content.decode())[0]
             ppft = re.findall(exp_ppft, r.content.decode())[0]
-            payload = {'login': XBOX_SIGN_IN["XBOX_EMAIL"], 'passwd': XBOX_SIGN_IN["XBOX_PASSWORD"], 'PPFT': ppft}
+            payload = {'login': os.environ["XBOX-EMAIL"], 'passwd': os.environ["XBOX-PASS"], 'PPFT': ppft}
             s.post(url_post, data=payload)
             api_headers = {'X-API-Key': os.environ["X-API-KEY"], 'x-csrf': s.cookies.get_dict()['bungled']}
             r = s.get(
-                f'https://www.bungie.net/en/OAuth/Authorize?client_id={os.environ["CLIENT_ID"]}&response_type=code',
+                f'https://www.bungie.net/en/OAuth/Authorize?client_id={os.environ["CLIENT-ID"]}&response_type=code',
                 headers=api_headers,
                 verify=False)
-            os.environ["AUTH_CODE"] = urlparse(url=r.url).query[5:]
+            os.environ["AUTH-CODE"] = urlparse(url=r.url).query[5:]
             self.__httpd.shutdown()
         except:
             global RETRIED_AUTH
@@ -124,11 +118,15 @@ class OAuth2:
 
     def __get_tokens(self):
         try:
-            self.__update_post_data()
-            response = requests.post(url=TOKEN_URL, headers=self.__headers, data=self.__data)
+            data = {
+                'grant_type': "authorization_code",
+                'code': os.getenv("AUTH-CODE"),
+            }
+            response = requests.post(url=TOKEN_URL, headers=self.__headers, data=data)
             response = response.json()
-            os.environ["ACCESS_TOKEN"] = response['access_token']
-            os.environ["REFRESH_TOKEN"] = response['refresh_token']
+            os.environ["ACCESS-TOKEN"] = response['access_token']
+            os.environ["REFRESH-TOKEN"] = response['refresh_token']
+            self.__api._renew_headers()
         except:
             global RETRIED_TOKEN
             if not RETRIED_TOKEN:
@@ -144,11 +142,15 @@ class OAuth2:
             while datetime.now() < token_expiration and self._enabled:
                 time.sleep(5)
             try:
-                self.__update_post_data()
-                response = requests.post(url=TOKEN_URL, headers=self.__headers, data=self.__data)
+                data = {
+                    'grant_type': "refresh_token",
+                    'refresh_token': os.environ["REFRESH-TOKEN"],
+                }
+                response = requests.post(url=TOKEN_URL, headers=self.__headers, data=data)
                 response = response.json()
-                os.environ["ACCESS_TOKEN"] = response['access_token']
-                os.environ["REFRESH_TOKEN"] = response['refresh_token']
+                os.environ["ACCESS-TOKEN"] = response['access_token']
+                os.environ["REFRESH-TOKEN"] = response['refresh_token']
+                self.__api._renew_headers()
             except:
                 global RETRIED_RENEWAL
                 if not RETRIED_RENEWAL:
