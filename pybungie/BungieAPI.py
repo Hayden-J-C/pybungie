@@ -3,7 +3,7 @@ import os
 import requests
 
 from .OAuth2 import OAuth2
-from .destiny_enums import MembershipType, Components
+from .destiny_enums import MembershipType, VendorHash, Components
 
 API_ROOT_PATH = "https://www.bungie.net/Platform"
 
@@ -144,7 +144,7 @@ class BungieAPI:
         return (api_call.json())['Response']
 
     def get_vendor(self, membership_type: MembershipType, membership_id: int, character_id: int,
-                   vendor_hash: int, components: Components) -> dict:
+                   vendor_hash: VendorHash, components: Components) -> dict:
         """ Get the details of a specific Vendor.
 
         :param membership_type: The membership type of the associated player in the search. See destiny_enums->MembershipType
@@ -155,7 +155,7 @@ class BungieAPI:
         :return: dict
         """
         api_call = requests.get(f'{API_ROOT_PATH}/Destiny2/{membership_type.value}/Profile/{membership_id}/Character/'
-                                f'{character_id}/Vendors/{vendor_hash}/?components={components.value}',
+                                f'{character_id}/Vendors/{vendor_hash.value}/?components={components.value}',
                                 headers=self.__HEADERS)
         return (api_call.json())['Response']
 
