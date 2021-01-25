@@ -10,7 +10,6 @@ pip install pybungie
 
 <sup><sub>*Not suitable for production code</sup></sub>
 
-
 ## Getting Started
 In your working directory, after installing pybungie, edit the ini file before getting started. The file should be located here.
 
