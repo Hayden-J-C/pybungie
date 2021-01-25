@@ -60,7 +60,7 @@ class BungieAPI:
         :param membership_id: The membership ID of the player.
         :return: dict
         """
-        api_call = requests.get(f'{API_ROOT_PATH}/User/GetBungieNetUserById/{membership_id}/',
+        api_call = requests.get(f'{API_ROOT_PATH}/User/GetBungieNetUserById/{str(membership_id)}/',
                                 headers=self.__HEADERS)
         return (api_call.json())['Response']
 
