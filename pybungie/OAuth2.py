@@ -13,7 +13,6 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 import ssl
 from dotenv import load_dotenv
 
-
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 load_dotenv()
@@ -27,8 +26,6 @@ exp_urlpost = r'urlPost:\'(https://.*?)\''
 exp_ppft = r'<input type="hidden" name="PPFT" id=".*" value="(.*?)"/>'
 TOKEN_URL = "https://www.bungie.net/platform/app/oauth/token/"
 BUNGIE_SIGN_IN_URI = "https://www.bungie.net/en/User/SignIn/Xuid?bru=%252f"
-
-RETRIED_AUTH = RETRIED_TOKEN = RETRIED_RENEWAL = RETRIED_SERVER = False
 
 
 class OAuth2:
@@ -82,13 +79,8 @@ class OAuth2:
             self.server_thread = threading.Thread(target=self.__httpd.serve_forever)
             self.server_thread.start()
         except:
-            global RETRIED_SERVER
-            if not RETRIED_SERVER:
-                RETRIED_SERVER = True
-                with open('err.log', 'a') as f:
-                    f.write(f'WARNING Server startup failed! {datetime.now().strftime("%m/%d/%Y at %H:%M:%S")} \n')
-                self.__cert_gen()
-                self.__start_server()
+            with open('err.log', 'a') as f:
+                f.write(f'WARNING Server startup failed! {datetime.now().strftime("%m/%d/%Y at %H:%M:%S")} \n')
 
     def __get_authorization_code(self):
         try:
@@ -108,13 +100,9 @@ class OAuth2:
             os.environ["AUTH-CODE"] = urlparse(url=r.url).query[5:]
             self.__httpd.shutdown()
         except:
-            global RETRIED_AUTH
-            if not RETRIED_AUTH:
-                RETRIED_AUTH = True
-                with open('err.log', 'a') as f:
-                    f.write(
-                        f'WARNING Unable to acquire authentication code! {datetime.now().strftime("%m/%d/%Y at %H:%M:%S")}\n')
-                self.__get_authorization_code()
+            with open('err.log', 'a') as f:
+                f.write(
+                    f'WARNING Unable to acquire authentication code! {datetime.now().strftime("%m/%d/%Y at %H:%M:%S")}\n')
 
     def __get_tokens(self):
         try:
@@ -128,13 +116,8 @@ class OAuth2:
             os.environ["REFRESH-TOKEN"] = response['refresh_token']
             self.__api._renew_headers()
         except:
-            global RETRIED_TOKEN
-            if not RETRIED_TOKEN:
-                RETRIED_TOKEN = True
-                with open('err.log', 'a') as f:
-                    f.write(f'WARNING Unable to acquire tokens! {datetime.now().strftime("%m/%d/%Y at %H:%M:%S")}\n')
-                self.__get_authorization_code()
-                self.__get_tokens()
+            with open('err.log', 'a') as f:
+                f.write(f'WARNING Unable to acquire tokens! {datetime.now().strftime("%m/%d/%Y at %H:%M:%S")}\n')
 
     def __renew_tokens(self):
         while self._enabled:
@@ -152,10 +135,5 @@ class OAuth2:
                 os.environ["REFRESH-TOKEN"] = response['refresh_token']
                 self.__api._renew_headers()
             except:
-                global RETRIED_RENEWAL
-                if not RETRIED_RENEWAL:
-                    RETRIED_RENEWAL = True
-                    with open('err.log', 'a') as f:
-                        f.write(f'WARNING Unable to renew tokens! {datetime.now().strftime("%m/%d/%Y at %H:%M:%S")}\n')
-                    self.__get_authorization_code()
-                    self.__get_tokens()
+                with open('err.log', 'a') as f:
+                    f.write(f'WARNING Unable to renew tokens! {datetime.now().strftime("%m/%d/%Y at %H:%M:%S")}\n')
