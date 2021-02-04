@@ -49,7 +49,7 @@ class OAuth2:
         self.__renewal_thread.start()
 
     @staticmethod
-    def __cert_gen():
+    def __cert_gen():  # Generate server.pem file
         serial_number = 0
         validity_end_in_seconds = 10 * 365 * 24 * 60 * 60
         k = crypto.PKey()
@@ -84,20 +84,18 @@ class OAuth2:
 
     def __get_authorization_code(self):
         try:
-            if not self.server_thread.is_alive():
-                self.__start_server()
             s = requests.Session()
             r = s.get(BUNGIE_SIGN_IN_URI)
             url_post = re.findall(exp_urlpost, r.content.decode())[0]
             ppft = re.findall(exp_ppft, r.content.decode())[0]
             payload = {'login': os.environ["XBOX-EMAIL"], 'passwd': os.environ["XBOX-PASS"], 'PPFT': ppft}
-            s.post(url_post, data=payload)
+            s.post(url_post, data=payload)  # Login to bungie.net using you xbox live account
             api_headers = {'X-API-Key': os.environ["X-API-KEY"], 'x-csrf': s.cookies.get_dict()['bungled']}
             r = s.get(
                 f'https://www.bungie.net/en/OAuth/Authorize?client_id={os.environ["CLIENT-ID"]}&response_type=code',
                 headers=api_headers,
-                verify=False)
-            os.environ["AUTH-CODE"] = urlparse(url=r.url).query[5:]
+                verify=False)  # Authorize your app
+            os.environ["AUTH-CODE"] = urlparse(url=r.url).query[5:]  # Get the auth code from redirect url
             self.__httpd.shutdown()
         except:
             with open('err.log', 'a') as f:
